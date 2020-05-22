@@ -8,15 +8,18 @@ package com.lamontd.lahmans.neo4j.writer.springboot.services;
 import com.lamontd.lahmans.neo4j.core.handlers.TransportObjectHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lamontd.transactionmanager.service.ComponentTransactionKafkaSender;
 import com.lamontd.utils.jackson.JacksonMapper;
 import com.lamontd.utils.transport.MappedTransportObject;
+import com.lamontd.utils.transport.StorageException;
+import com.lamontd.utils.transport.TransportConversionException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.streams.kstream.KStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 /**
  *
@@ -28,6 +31,8 @@ public class KafkaMessageReader {
     
     @Autowired
     private TransportObjectHandler transportObjectHandler;
+    @Autowired
+    private ComponentTransactionKafkaSender transactionSender;
     
     public KafkaMessageReader() {
         logger.info("I have the power of Greyskull!");
@@ -43,7 +48,21 @@ public class KafkaMessageReader {
             } else if (incomingObject.getAttributes() == null || incomingObject.getAttributes().isEmpty()) {
                 logger.warn("Found message of type " + incomingObject.getObjectType() + " but no attributes");
             } else {
-                transportObjectHandler.process(incomingObject);
+                try {
+                boolean handledSuccessfully = transportObjectHandler.process(incomingObject);
+                if (StringUtils.isNotEmpty(incomingObject.getTransactionId())) {
+                    if (handledSuccessfully) {
+                        transactionSender.publishAck(incomingObject.getTransactionId());
+                    } else {
+                        transactionSender.publishNak(incomingObject.getTransactionId());
+                    }
+                }
+                } catch (TransportConversionException | StorageException ex) {
+                    logger.error("Failed to convert and storage incpoming transport object", ex);
+                    if (StringUtils.isNotEmpty(incomingObject.getTransactionId())) {
+                        transactionSender.publishNak(incomingObject.getTransactionId());
+                    }
+                }
             }
         } catch (JsonProcessingException ex) {
             logger.warn("Error processing incoming message", ex);

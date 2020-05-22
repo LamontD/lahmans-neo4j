@@ -26,6 +26,7 @@ import com.lamontd.lahmans.neo4j.core.repositories.PlayerHonorRepository;
 import com.lamontd.lahmans.neo4j.core.repositories.PlayerRepository;
 import com.lamontd.utils.transport.MappedTransportObject;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +59,9 @@ public class PlayerHonorConverter extends MappedTransportObjectConverter<PlayerH
         honor.setTie(convertToBoolean(attributes.get("tie")));
         honor.setPosition((String) attributes.get("notes"));
         honor.setAward(findAward((String) attributes.get("awardID")));
-        honor.setLeague(findLeague((String) attributes.get("league")));
+        if (StringUtils.isNotBlank((String) attributes.get("league"))) {
+            honor.setLeague(findLeague((String) attributes.get("league")));
+        }
         honor.setPlayer(findPlayer((String) attributes.get("playerID")));
         return honor;
     }

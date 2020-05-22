@@ -17,6 +17,8 @@ package com.lamontd.lahmans.neo4j.core.handlers;
 
 import com.lamontd.utils.transport.MappedTransportObjectConverter;
 import com.lamontd.utils.transport.MappedTransportObject;
+import com.lamontd.utils.transport.StorageException;
+import com.lamontd.utils.transport.TransportConversionException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,7 +37,7 @@ public class TransportObjectHandler {
     @Autowired
     private ApplicationContext applicationContext;
 
-    public void process(MappedTransportObject transportObject) {
+    public boolean process(MappedTransportObject transportObject) throws TransportConversionException, StorageException {
         for (MappedTransportObjectConverter converter : applicationContext.getBeansOfType(MappedTransportObjectConverter.class).values()) {
             if (converter.canHandle(transportObject)) {
                 logger.debug("Using " + converter.getClass() + " to handle transport object of type " + transportObject.getObjectType());
@@ -43,9 +45,9 @@ public class TransportObjectHandler {
                 if (StringUtils.isNotBlank(transportObject.getTransactionId())) {
                     logger.info("Processed transaction " + transportObject.getTransactionId());
                 }
-                return;
+                return true;
             }
         }
-        throw new UnsupportedOperationException("Object type [" + transportObject.getObjectType() + "] not supported yet");
+        return false;
     }
 }
